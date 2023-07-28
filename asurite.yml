@@ -1,0 +1,38 @@
+# OpenAPI ASURITE Issuance API
+openapi: 3.0.3
+info:
+  title: ASURITE Request API
+  description: This API is used to request an ASURITE ID for a Principal, new or existing.
+  contact:
+    name: Chandi Cumaranatunge
+    email: iamchandi@asu.edu
+  version: 0.9.0
+
+servers:
+  - url: https://fake.mocks.asu.edu/{basePath}/{version}
+    description: Mock server for testing
+    variables:
+      basePath:
+        default: api
+      version:
+        default: v1
+        description: API version
+
+paths:
+  /principal/asuriteid:
+    post:
+      summary: Request an ASURITE ID
+      description: |
+        This API is used to request an ASURITE ID for a Principal. A search match
+        is performed to determine if the Principal already has an ASURITE ID. 
+        If a match is found (100% assurance), the existing ASURITE ID is returned. 
+        If no match is not found (0% search match), a new ASURITE ID is generated and returned.
+        If manual identity resolution is required, the request is queued for review.
+      operationId: asurite
+      requestBody:
+        description: ASURITE Request
+        required: true
+        content:
+          application/json:
+
+      responses:
