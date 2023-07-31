@@ -28,11 +28,155 @@ paths:
         If a match is found (100% assurance), the existing ASURITE ID is returned. 
         If no match is not found (0% search match), a new ASURITE ID is generated and returned.
         If manual identity resolution is required, the request is queued for review.
-      operationId: asurite
+      tags:
+        - ASURITE
       requestBody:
-        description: ASURITE Request
         required: true
         content:
           application/json:
+            schema:
+              $ref: "#/components/schemas/ASURITEIDRequest"
 
       responses:
+        "200":
+          description: The ASURITE ID was successfully issued or matched.
+          content:
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/ASURITEIDSuccessResponse"
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ASURITEIDSuccessResponse"
+        "202":
+          description: The ASURITE ID request was deferred for manual identity resolution.
+          content:
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/ASURITEIDDeferredResponse"
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ASURITEIDDeferredResponse"
+        "400":
+          description: Bad request. Invalid input or missing required fields.
+          content:
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/Error"
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    ASURITEIDRequest:
+      type: object
+      required:
+        - name
+        - email
+        - dob
+        - applicantWID
+        - bpWID
+      properties:
+        name:
+          type: object
+          required:
+            - firstName
+            - lastName
+          properties:
+            firstName:
+              type: string
+            lastName:
+              type: string
+            middleName:
+              type: string
+            prefix:
+              type: string
+            suffix:
+              type: string
+        email:
+          type: string
+          format: email
+        dob:
+          type: string
+          format: date
+        applicantWID:
+          type: string
+          format: uuid
+          description: The unique Workday ID for the applicant.
+        bpWID:
+          type: string
+          format: uuid
+          description: The unique Workday ID of the Business Process.
+
+    ASURITEIDSuccessResponse:
+      type: object
+      required:
+        - name
+        - emplId
+        - asuriteId
+        - email
+        - campusId
+        - reason
+      properties:
+        name:
+          type: object
+          required:
+            - firstName
+            - lastName
+          properties:
+            firstName:
+              type: string
+            lastName:
+              type: string
+        emplId:
+          type: string
+          pattern: '^\d{10}$'
+        asuriteId:
+          type: string
+          description: The ASURITE ID that was issued or matched.
+        email:
+          type: string
+          format: email
+        campusId:
+          type: string
+          description: The Campus ID.
+        reason:
+          $ref: "#/components/schemas/ResponseReason"
+
+    ASURITEIDDeferredResponse:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          $ref: "#/components/schemas/ResponseReason"
+
+    ResponseReason:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - "NEW"
+            - "MATCH"
+            - "MANUAL"
+        message:
+          type: string
+          enum:
+            - "New ASURITE ID issued"
+            - "ASURITE ID matched"
+            - "ASURITE ID queued for manual identity resolution"
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: The error code.
+        message:
+          type: string
+          description: A human-readable error message.
