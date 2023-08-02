@@ -76,39 +76,50 @@ components:
         - name
         - email
         - dob
-        - applicantWID
-        - bpWID
+        - applicantID
+        - processID
       properties:
         name:
-          type: object
-          required:
-            - firstName
-            - lastName
-          properties:
-            firstName:
-              type: string
-            lastName:
-              type: string
-            middleName:
-              type: string
-            prefix:
-              type: string
-            suffix:
-              type: string
+          $ref: "#/components/schemas/PersonName"
         email:
           type: string
           format: email
         dob:
           type: string
           format: date
-        applicantWID:
+        ssn:
+          type: string
+          pattern: '^\d{9}$'
+          description: The Social Security Number of the Principal (no dashes).
+        applicantID:
           type: string
           format: uuid
-          description: The unique Workday ID for the applicant.
-        bpWID:
+          description: |
+            The unique ID for the applicant from the client application (e.g. Workday ID).
+        processID:
           type: string
           format: uuid
-          description: The unique Workday ID of the Business Process.
+          description: |
+            The unique ID of the business process or component in the client 
+            application making the call (e.g. Workday Business Process ID).
+
+    PersonName:
+      type: object
+      required:
+        - firstName
+        - lastName
+      properties:
+        firstName:
+          type: string
+        lastName:
+          description: |
+            The last name of the Principal. Can be a single string or an array of strings
+            representing current and other last names used previously.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
 
     ASURITEIDSuccessResponse:
       type: object
@@ -164,14 +175,14 @@ components:
           enum:
             - "NEW"
             - "MATCH"
-            - "MANUAL"
+            - "DEFERRED"
         message:
           type: string
           description: A human-readable message describing the reason for the response.
           enum:
             - "New ASURITE ID issued"
             - "ASURITE ID matched"
-            - "ASURITE ID queued for manual identity resolution"
+            - "Queued for manual resolution"
 
     Error:
       type: object
