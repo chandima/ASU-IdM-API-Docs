@@ -1,7 +1,7 @@
 # OpenAPI ASURITE Issuance API
 openapi: 3.0.3
 info:
-  title: ASURITE Request API
+  title: Identity Provider API
   description: This API is used to request an ASURITE ID for a Principal, new or existing.
   contact:
     name: Chandi Cumaranatunge
@@ -19,45 +19,51 @@ servers:
         description: API version
 
 paths:
-  /principal/asuriteid:
+  /person/search:
     post:
-      summary: Request an ASURITE ID
+      summary: Person search and return principal information or create new principal
       description: |
-        This API is used to request an ASURITE ID for a Principal. A search match
-        is performed to determine if the Principal already has an ASURITE ID. 
-        If a match is found (100% assurance), the existing ASURITE ID is returned. 
-        If no match is not found (0% search match), a new ASURITE ID is generated and returned.
+        A search match is performed to determine if the Principal already exists. 
+        If a match is found (100% assurance in search match), the existing Principal is returned. 
+        If no match is not found (0% search match), a new Principal is created and returned.
         If manual identity resolution is required, the request is queued for review.
+
+        If the search match or identity creation is taking too long, the request will return with 
+        a 202 Accepted status code. A corresponding ``reason`` object will be included in the
+        response payload to the caller.
+
+        If the ``customSearchContext`` is provided, the designated custom search algorithm is used 
+        to find the Person. If not provided, the default search algorithm is used.
       tags:
-        - ASURITE
+        - Person
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ASURITEIDRequest"
+              $ref: "#/components/schemas/PersonSearchRequest"
 
       responses:
         "200":
-          description: The ASURITE ID was successfully issued or matched.
+          description: The Principal was created or matched.
           content:
             application/xml:
               schema:
-                $ref: "#/components/schemas/ASURITEIDSuccessResponse"
+                $ref: "#/components/schemas/PersonSearchSuccessResponse"
             application/json:
               schema:
-                $ref: "#/components/schemas/ASURITEIDSuccessResponse"
+                $ref: "#/components/schemas/PersonSearchSuccessResponse"
         "202":
           description: |
-            The ASURITE ID request is accepted but processing is taking to long or was 
+            The person search request is accepted but processing is taking to long or was 
             deferred for manual identity resolution.
           content:
             application/xml:
               schema:
-                $ref: "#/components/schemas/ASURITEIDDeferredResponse"
+                $ref: "#/components/schemas/PersonSearchDeferredResponse"
             application/json:
               schema:
-                $ref: "#/components/schemas/ASURITEIDDeferredResponse"
+                $ref: "#/components/schemas/PersonSearchDeferredResponse"
         "400":
           description: Bad request. Invalid input or missing required fields.
           content:
@@ -70,14 +76,13 @@ paths:
 
 components:
   schemas:
-    ASURITEIDRequest:
+    PersonSearchRequest:
       type: object
       required:
         - name
         - email
         - dob
-        - applicantID
-        - processID
+        - clientContext
       properties:
         name:
           $ref: "#/components/schemas/PersonName"
@@ -87,21 +92,10 @@ components:
         dob:
           type: string
           format: date
-        ssn:
-          type: string
-          pattern: '^\d{9}$'
-          description: The Social Security Number of the Principal (no dashes).
-        applicantID:
-          type: string
-          format: uuid
-          description: |
-            The unique ID for the applicant from the client application (e.g. Workday ID).
-        processID:
-          type: string
-          format: uuid
-          description: |
-            The unique ID of the business process or component in the client 
-            application making the call (e.g. Workday Business Process ID).
+        clientContext:
+          $ref: "#/components/schemas/ClientContext"
+        customSearchContext:
+          $ref: "#/components/schemas/CustomSearchContext"
 
     PersonName:
       type: object
@@ -117,11 +111,28 @@ components:
             representing current and other last names used previously.
           oneOf:
             - type: string
+              nullable: true
             - type: array
               items:
                 type: string
 
-    ASURITEIDSuccessResponse:
+    PersonSearchSuccessResponse:
+      type: object
+      required:
+        - principal
+        - clientContext
+        - reason
+      properties:
+        principal:
+          $ref: "#/components/schemas/Principal"
+        customSearchContext:
+          $ref: "#/components/schemas/CustomSearchContext"
+        clientContext:
+          $ref: "#/components/schemas/ClientContext"
+        reason:
+          $ref: "#/components/schemas/ResponseReason"
+
+    Principal:
       type: object
       required:
         - name
@@ -129,18 +140,9 @@ components:
         - asuriteId
         - email
         - campusId
-        - reason
       properties:
         name:
-          type: object
-          required:
-            - firstName
-            - lastName
-          properties:
-            firstName:
-              type: string
-            lastName:
-              type: string
+          $ref: "#/components/schemas/PersonName"
         emplId:
           type: string
           pattern: '^\d{10}$'
@@ -153,16 +155,92 @@ components:
         campusId:
           type: string
           description: The Campus ID.
+
+    PersonSearchDeferredResponse:
+      type: object
+      required:
+        - customSearchContext
+        - clientContext
+        - reason
+      properties:
+        customSearchContext:
+          $ref: "#/components/schemas/CustomSearchContext"
+        clientContext:
+          $ref: "#/components/schemas/ClientContext"
         reason:
           $ref: "#/components/schemas/ResponseReason"
 
-    ASURITEIDDeferredResponse:
+    CustomSearchContext:
       type: object
+      description: |
+        The search context is used to identify the custom search algorithm used to find the Person.
+        In addition to the required search algorithm identifier, the search context needs to contain
+        all the additional fields that are required to conduct the search.
+      oneOf:
+        - $ref: "#/components/schemas/CustomSearchContext1"
+
+    CustomSearchContext1:
+      type: object
+      description: |
+        The search context is used to identify the custom search algorithm used to find the Person.
+        In addition to the required search algorithm identifier, the search context needs to contain
+        all the additional fields that are required to conduct the search.
       required:
-        - reason
+        - searchAlgorithm
+        - searchParameters
       properties:
-        reason:
-          $ref: "#/components/schemas/ResponseReason"
+        searchAlgorithm:
+          type: string
+          example: WORKDAY_HCM_PERSON_SEARCH
+          description: |
+            The unique ID identifying the custom search algorithm to be used to find the Person.
+            This is a unique ID assigned by the Identity Provider to the custom search algorithm.
+        searchParameters:
+          type: object
+          description: |
+            The search parameters required by the custom search algorithm to find the Person.
+            The search parameters are specific to the custom search algorithm and are defined
+            by the Identity Provider.
+          additionalProperties: true
+          required:
+            - ssn
+          properties:
+            ssn:
+              type: string
+              pattern: '^\d{9}$'
+              description: The Social Security Number of the Principal (no dashes).
+
+    ClientContext:
+      type: object
+      description: |
+        The client context is used to identify the client application making the call.
+        In addition to the three required fields, the client context can contain any
+        number of additional fields that are relevant to the client application.
+      required:
+        - clientId
+        - personId
+        - requestId
+      additionalProperties: true
+      properties:
+        clientId:
+          type: string
+          example: edu.asu.workday.hcm
+          description:
+            The unique namespaced identifying the client application making the call.
+            This is a unique ID assigned by the Identity Provider to the client application.
+        personId:
+          type: string
+          example: 39d423a0-6858-4d01-b1f3-9d2ef09b7161
+          description:
+            The unique ID identifying the applicant in the client application (e.g. Workday ID).
+            This value is not used in the search logic.
+        requestId:
+          type: string
+          example: 4038f873-a636-48bb-9ff6-24c44157cbdd
+          description:
+            The unique ID identifying the business process or component in the client
+            application making the call (e.g. Workday Business Process ID).
+            This value is not used in the search logic.
 
     ResponseReason:
       type: object
