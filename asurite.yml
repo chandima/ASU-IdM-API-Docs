@@ -1,8 +1,8 @@
-# OpenAPI ASURITE Issuance API
 openapi: 3.0.3
 info:
   title: Identity Provider API
-  description: This API is used to request an ASURITE ID for a Principal, new or existing.
+  description: This API set implements identity provider methods
+    including searching for persons and creating principals.
   contact:
     name: Chandi Cumaranatunge
     email: iamchandi@asu.edu
@@ -31,9 +31,6 @@ paths:
         If the search match or identity creation is taking too long, the request will return with 
         a 202 Accepted status code. A corresponding ``reason`` object will be included in the
         response payload to the caller.
-
-        If the ``customSearchContext`` is provided, the designated custom search algorithm is used 
-        to find the Person. If not provided, the default search algorithm is used.
       tags:
         - Person
       requestBody:
@@ -58,10 +55,10 @@ paths:
             The person search request is accepted but processing is taking to long or was 
             deferred for manual identity resolution.
           content:
-            application/xml:
+            application/json:
               schema:
                 $ref: "#/components/schemas/PersonSearchDeferredResponse"
-            application/json:
+            application/xml:
               schema:
                 $ref: "#/components/schemas/PersonSearchDeferredResponse"
         "400":
@@ -79,42 +76,37 @@ components:
     PersonSearchRequest:
       type: object
       required:
-        - name
+        - firstName
+        - lastName
         - email
         - dob
         - clientContext
-      properties:
-        name:
-          $ref: "#/components/schemas/PersonName"
-        email:
-          type: string
-          format: email
-        dob:
-          type: string
-          format: date
-        clientContext:
-          $ref: "#/components/schemas/ClientContext"
-        customSearchContext:
-          $ref: "#/components/schemas/CustomSearchContext"
-
-    PersonName:
-      type: object
-      required:
-        - firstName
-        - lastName
+      additionalProperties: true
       properties:
         firstName:
           type: string
         lastName:
           description: |
             The last name of the Principal. Can be a single string or an array of strings
-            representing current and other last names used previously.
+            representing current and other last names used previously. Can be a null value.
           oneOf:
             - type: string
               nullable: true
             - type: array
               items:
                 type: string
+        email:
+          type: string
+          format: email
+        dob:
+          type: string
+          format: date
+        ssn:
+          type: string
+          pattern: '^\d{9}$'
+          description: The Social Security Number of the Principal (no dashes).
+        clientContext:
+          $ref: "#/components/schemas/ClientContext"
 
     PersonSearchSuccessResponse:
       type: object
@@ -125,8 +117,6 @@ components:
       properties:
         principal:
           $ref: "#/components/schemas/Principal"
-        customSearchContext:
-          $ref: "#/components/schemas/CustomSearchContext"
         clientContext:
           $ref: "#/components/schemas/ClientContext"
         reason:
@@ -141,8 +131,10 @@ components:
         - email
         - campusId
       properties:
-        name:
-          $ref: "#/components/schemas/PersonName"
+        firstName:
+          type: string
+        lastName:
+          type: string
         emplId:
           type: string
           pattern: '^\d{10}$'
@@ -163,52 +155,10 @@ components:
         - clientContext
         - reason
       properties:
-        customSearchContext:
-          $ref: "#/components/schemas/CustomSearchContext"
         clientContext:
           $ref: "#/components/schemas/ClientContext"
         reason:
           $ref: "#/components/schemas/ResponseReason"
-
-    CustomSearchContext:
-      type: object
-      description: |
-        The search context is used to identify the custom search algorithm used to find the Person.
-        In addition to the required search algorithm identifier, the search context needs to contain
-        all the additional fields that are required to conduct the search.
-      oneOf:
-        - $ref: "#/components/schemas/CustomSearchContext1"
-
-    CustomSearchContext1:
-      type: object
-      description: |
-        The search context is used to identify the custom search algorithm used to find the Person.
-        In addition to the required search algorithm identifier, the search context needs to contain
-        all the additional fields that are required to conduct the search.
-      required:
-        - searchAlgorithm
-        - searchParameters
-      properties:
-        searchAlgorithm:
-          type: string
-          example: WORKDAY_HCM_PERSON_SEARCH
-          description: |
-            The unique ID identifying the custom search algorithm to be used to find the Person.
-            This is a unique ID assigned by the Identity Provider to the custom search algorithm.
-        searchParameters:
-          type: object
-          description: |
-            The search parameters required by the custom search algorithm to find the Person.
-            The search parameters are specific to the custom search algorithm and are defined
-            by the Identity Provider.
-          additionalProperties: true
-          required:
-            - ssn
-          properties:
-            ssn:
-              type: string
-              pattern: '^\d{9}$'
-              description: The Social Security Number of the Principal (no dashes).
 
     ClientContext:
       type: object
@@ -258,8 +208,8 @@ components:
           type: string
           description: A human-readable message describing the reason for the response.
           enum:
-            - "New ASURITE ID issued"
-            - "ASURITE ID matched"
+            - "New Principal created"
+            - "Matched existing Principal"
             - "Queued for manual resolution"
 
     Error:
