@@ -31,6 +31,10 @@ paths:
         If the search match or identity creation is taking too long, the request will return with 
         a 202 Accepted status code. A corresponding ``reason`` object will be included in the
         response payload to the caller.
+
+        The default search logic will be utilized if only the required fields are provided. Custom
+        search logic can be triggered by providing non-required and additional fields in the 
+        request payload.
       tags:
         - Person
       requestBody:
@@ -88,7 +92,8 @@ components:
         lastName:
           description: |
             The last name of the Principal. Can be a single string or an array of strings
-            representing current and other last names used previously. Can be a null value.
+            representing current and other last names used previously. Can be a null value
+            to accomodate individual who don't have a last name.
           oneOf:
             - type: string
               nullable: true
@@ -175,9 +180,7 @@ components:
         clientId:
           type: string
           example: edu.asu.workday.hcm
-          description:
-            The unique namespaced identifying the client application making the call.
-            This is a unique ID assigned by the Identity Provider to the client application.
+          description: The unique namespace identifying the client application making the call.
         personId:
           type: string
           example: 39d423a0-6858-4d01-b1f3-9d2ef09b7161
